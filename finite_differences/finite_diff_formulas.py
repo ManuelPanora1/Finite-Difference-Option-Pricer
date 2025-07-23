@@ -124,7 +124,7 @@ def finite_difference_call(time_steps, price_steps, k, tfinal, S, sigma, r):
     #Final option price stored in center of computed grid
     return Vat[time_steps - 1, 0]
 
-def create_grid_cn(time_steps, price_steps, K, r, tfinal):
+def create_grid_cn(time_steps, price_steps, K, r, tfinal, s_min, s_max):
     """
     Initializes the grid for the Crank-Nicolson PDE solver.
 
@@ -154,9 +154,6 @@ def create_grid_cn(time_steps, price_steps, K, r, tfinal):
 
     V = np.zeros((price_steps, time_steps))
 
-    #Common industry parameters
-    s_min = K / 3
-    s_max = 2 * K
     s_range = np.linspace(s_min, s_max, price_steps)
 
     #Implement boundary conditions at expirey
@@ -228,7 +225,7 @@ def differentiation_matrix(n, s_span, dt, sigma, r, S):
 def adaptive_boundary(c, sigma, tfinal, S0):
     return S0 * np.exp(sigma * np.sqrt(tfinal)*c)
 
-def price_derivative_cn(n, m, K, r, tfinal, S, sigma):
+def price_derivative_cn(n, m, K, r, tfinal, S, sigma, test = False, grid_range = (0,0)):
     """
     Prices a European call option using Crank-Nicolson method.
     
@@ -248,6 +245,10 @@ def price_derivative_cn(n, m, K, r, tfinal, S, sigma):
         Current asset price.
     sigma : float
         Volatility.
+    s_min : float
+        Lower boundary for created grid
+    s_max : float
+        Upper boundary for created grid
     
     Returns
     -------
@@ -255,8 +256,12 @@ def price_derivative_cn(n, m, K, r, tfinal, S, sigma):
         Option price at S0.
     """
 
+    #Adaptive gird boundary definition
+    s_min = grid_range[0] if test else K / 3
+    s_max = grid_range[1] if test else K * 2
+
     #Begin by first creating option grid, price_grid, and time_grid
-    V, s_range, t= create_grid_cn(n, m, K, r, tfinal)
+    V, s_range, t= create_grid_cn(n, m, K, r, tfinal, s_min, s_max)
 
     #Constants
     smin = s_range[0]

@@ -36,25 +36,7 @@ def crank_nicholson(type, expiration, sigma, r, strike, NAS, NTS, s):
         V[1:NAS, t] = spsolve(ML, b)
         #V[0, t] = 2 * V[1, t] - V[2, t]
 
-
-    cs = CubicSpline(S, V[:,0], bc_type='natural')  # Clamped BCs
+    cs = CubicSpline(S, V[:,0], bc_type='natural')  
     price = cs(s)
-    print(price)
     return price
 
-"""
-if __name__ == "__main__":
-    K =95
-    sigma = 0.2
-    r = 0.05
-    expiration = 21/252
-    NAS = 1000
-    NTS = 1000
-    type = "call"
-
-    option_df = crank_nicholson(type = type, strike = K, sigma = sigma, r = r, 
-                                expiration = expiration, 
-                                NAS = NAS, NTS = NTS, s = 100)
-    
-    print(option_df)
-"""
