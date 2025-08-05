@@ -222,8 +222,8 @@ def differentiation_matrix(n, s_span, dt, sigma, r, S):
     return ML.tocsc(), MR.tocsc(), alpha, gamma
 
 #No drift used in this equation
-def adaptive_boundary(c, sigma, tfinal, S0):
-    return S0 * np.exp(sigma * np.sqrt(tfinal)*c)
+def adaptive_boundary(c, sigma, tfinal, K):
+    return K * np.exp(sigma * np.sqrt(tfinal)*c)
 
 def price_derivative_cn(n, m, K, r, tfinal, S, sigma, test = False, grid_range = (0,0)):
     """
@@ -256,12 +256,19 @@ def price_derivative_cn(n, m, K, r, tfinal, S, sigma, test = False, grid_range =
         Option price at S0.
     """
 
-    #Adaptive gird boundary definition
-    s_min = grid_range[0] if test else K / 3
-    s_max = grid_range[1] if test else K * 2
+    #Adaptive grid boundary definition
+    if (test):
+        s_min = grid_range[0] 
+        s_max = grid_range[1]
+    else: 
+        #Hardcode adaptive boundary depending on initial boundaries
+        std_dev = 3.5 if sigma*np.sqrt(tfinal) > 1 else 3
+        s_min = adaptive_boundary(-std_dev, sigma, tfinal, K)
+        s_max = adaptive_boundary(std_dev, sigma, tfinal, K)
+
 
     #Begin by first creating option grid, price_grid, and time_grid
-    V, s_range, t= create_grid_cn(n, m, K, r, tfinal, s_min, s_max)
+    V, s_range, t = create_grid_cn(n, m, K, r, tfinal, s_min, s_max)
 
     #Constants
     smin = s_range[0]
