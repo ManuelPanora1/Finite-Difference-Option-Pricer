@@ -60,10 +60,6 @@ def test_convergence_all(K, r, tfinal, S, sigma, error_range, f1, f2, *args):
 
                 #Compute neuman condition using change in time and change in asset price
                 Neumann_holds = delt <= (.5 * dels ** 2) / (sigma**2 * maxS**2)
-                print(dels, delt)
-                print(Neumann_holds)
-                print(m[j], n[i])
-                print()
                 #If the Neumann conditions do not hold, skip entry
                 if not Neumann_holds:
                     continue
@@ -74,7 +70,6 @@ def test_convergence_all(K, r, tfinal, S, sigma, error_range, f1, f2, *args):
             cnerrors[i, j] = abs(f1_price - bs_price)
             fderrors[i, j] = abs(f2_price - bs_price)
             values[i, j] = f1_price
-            print(cnerrors[i, j])
 
     return cnerrors, fderrors, values, neuman_conds
 
@@ -230,15 +225,15 @@ def optimal_NAS_NTS(K, tfinal, S, sigma, r, f1 = f.price_derivative_cn):
 
     #Generate list of values to test. Log scale to cluster time-steps around larger values
     #From previous experimentation, we have found that 2 ** 8, has been sufficient for time steps
-    NAS_upper = 2 ** 10
-    NAS_lower = 2 ** 5
-    NTS_upper = 2 ** 8
-    NTS_lower = 2 ** 5
-    NAS_intervals = 10
-    NTS_intervals = 10
+    NAS_upper = 2 ** 7
+    NAS_lower = 2 ** 2
+    NTS_upper = 2 ** 6
+    NTS_lower = 2 ** 2
+    NAS_intervals = 32
+    NTS_intervals = 32
 
-    NAS = np.round(np.sqrt(np.linspace((NAS_lower)**2, (NAS_upper)**2, NAS_intervals)).astype(int))
-    NTS = np.round(np.sqrt(np.linspace((NTS_lower)**2, (NTS_upper)**2, NTS_intervals)).astype(int))
+    NAS = np.round((np.linspace(np.sqrt(NAS_lower), np.sqrt(NAS_upper), NAS_intervals)**2).astype(int))
+    NTS = np.round((np.linspace(np.sqrt(NTS_lower), np.sqrt(NTS_upper), NTS_intervals)**2).astype(int))
     
     #For each possible pair, if it satisfies the Neumann condition and the advection condition, we compute the error
     bs_price = f.black_scholes_call(S, K, tfinal, r, sigma)
@@ -255,16 +250,10 @@ def optimal_NAS_NTS(K, tfinal, S, sigma, r, f1 = f.price_derivative_cn):
     Smax = adaptive_boundary(std_dev, sigma, tfinal, K)
 
     for i in range(NAS_intervals):
-        for j in range(NTS_intervals):
-            
+        for j in range(NTS_intervals):      
             delt = tfinal / NTS[j]
             dels = (Smax - Smin) / NAS[i]
-            Neumann_holds = (delt <= (.5 * dels ** 2) / (sigma**2 * Smax **2))
-            print(NAS[j], NTS[i])
-            print(dels, delt)
-            print(Neumann_holds)
-            print()
-            if (advection_condition(delt, dels, r, Smax) and  Neumann_holds):
+            if (advection_condition(delt, dels, r, Smax)):
                 f1_price = f1(NTS[j], NAS[i], K, r, tfinal, S, sigma)
                 #Measure in relative error terms
                 #TODO FOUND LARGE BUG WHAT IF IT IS WORTHLESS? THINK ABOUT IT!
@@ -273,10 +262,9 @@ def optimal_NAS_NTS(K, tfinal, S, sigma, r, f1 = f.price_derivative_cn):
                     min_error = f1errors[i, j]
                     min_steps = [i,j]
     
-    print(f1errors)
     mask = f1errors > 0
     f1errors = f1errors[mask]
 
-    return NAS[min_steps[0]], NTS[min_steps[1]]
+    return NAS[min_steps[0]], NTS[min_steps[1]], min_error
 
     #Return the NAS and NTS that minimizes the error

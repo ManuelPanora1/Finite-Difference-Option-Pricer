@@ -1,51 +1,94 @@
 # Finite-Difference-Option-Pricer
 
-6/21/25 Setup the finite difference computations
+This project implements a vectorized European option pricer using finite-difference methods, with a particular focus on the Crank–Nicolson scheme. The primary goals were to validate boundary conditions, determine optimal discretizations for stability and accuracy, and explore a machine learning approach for adaptive grid selection.
 
-6/23/25 We will measure the convergence of these finite differnces
+---
 
-6/24/25 Finished loop to compute derivative according to pde, maybe find more efficient way to implement? Crank Nicolson is the way in the future, currently working on vectorizing all operations! We have completed the vectorization on my own as well! Very nice!
+## Project Timeline
 
-Created option pricer using finite differences. Implemented using vectorized approach to save on computational overhead. Filled in initial grid and accounted for boundary conditions. I first implemented the naive method for pricing the option. True implementations utilize the Crank-Nicolson implementation.
+- **6/21/25:** Set up basic finite difference computations.  
+- **6/23/25:** Began measuring convergence of finite differences.  
+- **6/24/25:** Completed vectorized derivative calculations; initial naive method implemented. Crank–Nicolson method planned for later improvement.  
+- **6/25–6/26/25:** Implemented and investigated Crank–Nicolson (CN) for boundary value problems; started exploring stability under constant volatility assumption.  
+- **7/1/25:** Fully implemented CN method; began rigorous testing.  
+- **7/11–7/12/25:** Addressed non-uniform spacing in the asset grid; CN method functional but numerically unstable.  
+- **7/14/25:** Found asset price steps (NAS) have the largest effect on error.  
+- **7/23/25:** Tested adaptive grids for different conditions. Started integrating optimization approach for initial grid selection.  
+- **8/1–8/4/25:** Validated Neumann and advection conditions, refined time steps and boundaries. Identified need for finer asset step clustering near key strike regions. Explored parallel processing for faster computations.
 
+---
 
-6/25/25 Implement and investigate Crank-Nicolson method for boundary value problems. A good question to ask is "for this surface is it ok to assume that the volatility is constant?". Spent today investigating IVBVP.
+## Summary of Findings
 
-6/26/25 Today will implement the Crank-Nicolson method for IVBVP
+### Boundary Conditions
 
-7/1/25 Today I will fully implement it and then I will rigorously test it an ensure that I have built the correct item!
+Empirically validated that **dynamic boundaries**:
 
-7/11/25 Today we have encountered an issue here. We have assumed uniform spacing in the grid for S but then this results in non constant spacing for delta x complicating the calculation of the differentiation matrix. To fix this I am going to recreate the grid to handle this non uniform spacing.
+\[
+S_\text{min} = K \cdot e^{-3\sigma\sqrt{T}}, \quad S_\text{max} = K \cdot e^{3\sigma\sqrt{T}}
+\]
 
-7/12/25 We have created a working function of the Crank Nicolson method. I understand everything, though it is numerically unstable and I must work to improve those instabilities! We have to optimize across two variables, we will see which is the best for now and see what happens.
+- Yield errors < 0.01% across a wide range of strikes, volatilities, and maturities.  
+- Cover 99.7% of possible ending price trajectories.  
+- Most numerically stable.
 
-7/14/25 Asset price steps matter the most in our CN method as increasing them reduces the error. This makes sense
+**Ranges tested:**  
+- Strikes (`K`): 10–500  
+- Volatilities (`σ`): 0.1–0.5  
+- Maturities (`T`): 0.1–10 years  
 
-7/23/25 The next step is to make it adaptive to different conditions. That is what I am going to test now, for the rest of this session that is what I will focus on and the rest of the time I will focus on a machine learning program and make life great no matter what! I am going to make the best choices and life is going to be great!
+**Extreme cases:** For `σ > 0.5` or `T > 10`, increase number of standard deviations (`n_std`) to `4 * sqrt(min(T, 1.0))`.
 
-8/1/25 I am going to break this project for a little bit, but if I can finish this with the testing today, that would be amazing! Let me get to work and I will make this happen! Advection conditions is satisfied in most cases, but should still be used in finding the optimal initial conditions. This may become an optimization problem. We can now validate the Neumann condition so that even if it does satisfy it, the residual must be shorter. The best solution for now is to 
+---
 
-8/2/25 Shocking discovery made, we are not using the correct number of time steps, we are making tremendous gaps, so we need more clustering near larger values. I think that exp could do this for us?
+### Optimal Discretization
 
-# Summary of findings
+- **Time Step:**  
 
-## Boundary Conditions
-Empirically validated that dynamic boundaries:  
-`S_min = K * exp(-3σ√T)`, `S_max = K * exp(3σ√T)`  
-yield errors < .01% across and covers 99.7% possible ending price trajectories, and is most numerically stable:  
-- Strikes (`K`): 10 to 500  
-- Volatilities (`σ`): 0.1 to 0.5  
-- Maturities (`T`): 0.1 to 10 years  
+\[
+\Delta t \leq \frac{(\Delta S)^2}{2\sigma^2 S_\text{max}^2}
+\]
 
-For extreme cases (e.g., `σ > 0.5` or `T > 10`), use:  
-`n_std = 4 * sqrt(min(T, 1.0))`.
+Necessary but insufficient condition for stability; ensures Crank–Nicolson residuals remain controlled.
 
-## Optimal Discretization
-- **Time Step**: `Δt ≤ 0.5 * (ΔS)² / (σ² S_max²)`.
-In satisfying the Neumann condition, we created necessary but insufficient conditions for the stability in this option pricing model for all cases.
-- **Boundaries**: `n_std = 3.5` if `σ√T > 1`, else `3.0`.
+- **Boundary Selection:**  
 
-- **Asset Grid**: Use `sinh_grid` with clustering near `K`.
+\[
+n_\text{std} = 
+\begin{cases} 
+3.5 & \text{if } \sigma\sqrt{T} > 1 \\
+3.0 & \text{otherwise} 
+\end{cases}
+\]
 
-## Future Directions
-- Continue Improving European Stock Option Pricer
+- **Asset Grid:** Use sinh-based spacing with clustering near `K` for higher accuracy.
+
+- **Observation:** Asset price steps (NAS) significantly impact numerical error; time steps (NTS) less so if within stability bounds.
+
+---
+
+### Adaptive Grid via Continuous Mapping
+
+- Generated a **lookup table** of optimal `(NAS, NTS)` for ~12,000 cases (reduced from ~3 million to focus on realistic regions).  
+- Fitted a **continuous mapping** from initial conditions `(K, T, S0, σ)` to `(NAS, NTS)`.  
+- Advantage: can predict near-optimal grid parameters for **unseen points** inside the convex hull of training data.  
+
+**Testing Results:**  
+- Evaluated CN pricing against Black–Scholes prices.  
+- Relative errors remained **under 10%** for unseen cases.  
+- Confirms the mapping generalizes well and provides accurate grid selection.
+
+---
+
+### Future Directions
+
+1. Extend to **American or barrier options** using implicit finite difference schemes.  
+2. Investigate **non-constant volatility models** (local or stochastic volatility).  
+3. Optimize parallel processing and further reduce computation time for large grids.  
+4. Explore **dynamic grid refinement** driven by machine learning or error estimates to maximize accuracy with minimal computational cost.
+
+---
+
+### Conclusion
+
+This project demonstrates a robust framework for vectorized European option pricing using Crank–Nicolson finite differences. By carefully selecting dynamic boundaries, discretization steps, and adaptive grids, the method achieves high accuracy while remaining computationally efficient. The continuous mapping approach allows practical application to previously unseen option parameters, making this framework versatile for real-world scenarios.
